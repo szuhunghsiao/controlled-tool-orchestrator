@@ -5,6 +5,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
+from app.api.health import router as health_router
+from app.api.tools import router as tools_router
 from app.db import get_engine
 from app.logging import setup_logging
 from app.migrations import run_migrations
@@ -48,6 +50,7 @@ def create_app() -> FastAPI:
         return response
 
     app.include_router(health_router)
+    app.include_router(tools_router)
     return app
 
 
