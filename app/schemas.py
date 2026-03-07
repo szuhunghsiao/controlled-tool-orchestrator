@@ -12,6 +12,7 @@ class ToolCreate(BaseModel):
     version: str = Field(min_length=1, max_length=32)
     description: str = Field(min_length=1)
     runtime: str
+    entrypoint: str = Field(min_length=1, max_length=256)
     timeout_ms: int = Field(gt=0, le=300000)
     input_schema: dict[str, Any]
 
@@ -29,6 +30,7 @@ class ToolResponse(BaseModel):
     version: str
     description: str
     runtime: str
+    entrypoint: str
     timeout_ms: int
     input_schema: dict[str, Any]
     is_active: bool
@@ -37,3 +39,19 @@ class ToolResponse(BaseModel):
 
 class ToolListResponse(BaseModel):
     items: list[ToolResponse]
+
+class ExecutionCreate(BaseModel):
+    tool_name: str = Field(min_length=1, max_length=128)
+    tool_version: str = Field(min_length=1, max_length=32)
+    input: dict[str, Any]
+
+
+class ExecutionResponse(BaseModel):
+    tool_name: str
+    tool_version: str
+    status: str
+    exit_code: int | None
+    stdout: str
+    stderr: str
+    output: dict[str, Any] | None
+    trace_id: str

@@ -26,6 +26,7 @@ class Tool(Base):
     version: Mapped[str] = mapped_column(String(32), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     runtime: Mapped[str] = mapped_column(String(64), nullable=False)
+    entrypoint: Mapped[str] = mapped_column(String(256), nullable=False)
     timeout_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     input_schema: Mapped[str] = mapped_column(Text, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

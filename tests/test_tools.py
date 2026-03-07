@@ -1,24 +1,6 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.main import create_app
-
-
-from app.db import get_engine
-from app.models import Base
-
-@pytest.fixture
-async def app():
-    from app.db import get_engine
-    from app.models import Base
-
-    engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-
-    return create_app()
-
 @pytest.mark.asyncio
 async def test_create_and_get_tool(app):
     # app = create_app()
@@ -30,6 +12,7 @@ async def test_create_and_get_tool(app):
             "version": "v1",
             "description": "echo tool",
             "runtime": "subprocess-v1",
+            "entrypoint": "tool_impls/echo.py",
             "timeout_ms": 1000,
             "input_schema": {
                 "type": "object",
@@ -64,6 +47,7 @@ async def test_list_tools(app):
             "version": "v1",
             "description": "adder tool",
             "runtime": "subprocess-v1",
+            "entrypoint": "tool_impls/echo.py",
             "timeout_ms": 2000,
             "input_schema": {
                 "type": "object",
@@ -92,6 +76,7 @@ async def test_duplicate_tool_version_returns_409(app):
             "version": "v1",
             "description": "echo tool",
             "runtime": "subprocess-v1",
+            "entrypoint": "tool_impls/echo.py",
             "timeout_ms": 1000,
             "input_schema": {
                 "type": "object",

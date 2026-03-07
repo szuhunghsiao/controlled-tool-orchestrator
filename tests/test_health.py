@@ -1,12 +1,10 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.main import create_app
 
 
 @pytest.mark.asyncio
-async def test_healthz_ok():
-    app = create_app()
+async def test_healthz_ok(app):
     transport = ASGITransport(app=app)
 
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -17,8 +15,7 @@ async def test_healthz_ok():
 
 
 @pytest.mark.asyncio
-async def test_readyz_ok():
-    app = create_app()
+async def test_readyz_ok(app):
     transport = ASGITransport(app=app)
 
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
