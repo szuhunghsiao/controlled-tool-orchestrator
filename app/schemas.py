@@ -55,3 +55,4 @@ class ExecutionResponse(BaseModel):
     stderr: str
     output: dict[str, Any] | None
     trace_id: str
+    latency_ms: int

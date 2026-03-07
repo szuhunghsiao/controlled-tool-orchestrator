@@ -7,7 +7,7 @@ from app.models import Tool
 from app.runtime import run_subprocess_tool
 from app.schemas import ExecutionCreate, ExecutionResponse
 from app.policy.engine import evaluate
-from app.policy.rules import PolicyViolation
+from app.settings import settings
 
 router = APIRouter(prefix="/executions", tags=["executions"])
 
@@ -29,27 +29,34 @@ async def execute_tool(
     if tool is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tool not found")
 
-    try:
-        evaluate(tool, payload.input)
-    except PolicyViolation as e:
+    decision = evaluate(tool, payload.input, max_input_bytes=settings.max_input_bytes)
+    if not decision.allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=e.message,
+            detail=decision.reason,
         )
 
     runtime_result = await run_subprocess_tool(
         entrypoint=tool.entrypoint,
         tool_input=payload.input,
         timeout_ms=tool.timeout_ms,
+        max_stdout_bytes=settings.max_stdout_bytes,
+        max_stderr_bytes=settings.max_stderr_bytes,
     )
 
     trace_id = request.headers.get("x-trace-id", "")
 
     if runtime_result.status == "timeout":
         raise HTTPException(
-            status_code=status.HTTP_408_REQUEST_TIMEOUT,
-            detail="tool timeout",
-        )
+            status_code=status.HTTP_408_REQUEST_TIMEOUT, 
+            detail="tool_timeout"
+            )
+
+    if runtime_result.status == "output_too_large":
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, 
+            detail="tool_output_too_large"
+            )
 
     return ExecutionResponse(
         tool_name=tool.name,
@@ -60,4 +67,5 @@ async def execute_tool(
         stderr=runtime_result.stderr,
         output=runtime_result.output,
         trace_id=trace_id,
+        latency_ms=runtime_result.latency_ms,
     )
