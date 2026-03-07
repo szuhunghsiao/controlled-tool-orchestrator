@@ -6,6 +6,8 @@ from app.deps import get_db_session
 from app.models import Tool
 from app.runtime import run_subprocess_tool
 from app.schemas import ExecutionCreate, ExecutionResponse
+from app.policy.engine import evaluate
+from app.policy.rules import PolicyViolation
 
 router = APIRouter(prefix="/executions", tags=["executions"])
 
@@ -27,13 +29,12 @@ async def execute_tool(
     if tool is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tool not found")
 
-    if not tool.is_active:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="tool is inactive")
-
-    if tool.runtime != "subprocess-v1":
+    try:
+        evaluate(tool, payload.input)
+    except PolicyViolation as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"unsupported runtime: {tool.runtime}",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=e.message,
         )
 
     runtime_result = await run_subprocess_tool(
