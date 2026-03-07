@@ -56,3 +56,24 @@ class ExecutionResponse(BaseModel):
     output: dict[str, Any] | None
     trace_id: str
     latency_ms: int
+
+class ExecutionRecordResponse(BaseModel):
+    id: int
+    tool_name: str
+    tool_version: str
+    runtime: str
+    entrypoint: str
+    status: str
+    error_code: str | None
+    input_json: dict[str, Any]
+    output_json: dict[str, Any] | None
+    stdout: str
+    stderr: str
+    exit_code: int | None
+    latency_ms: int
+    trace_id: str
+    created_at: datetime
+
+
+class ExecutionRecordListResponse(BaseModel):
+    items: list[ExecutionRecordResponse]

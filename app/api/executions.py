@@ -2,12 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import create_execution_record
 from app.deps import get_db_session
 from app.models import Tool
+from app.models import ExecutionRecord
+from app.policy.engine import evaluate
 from app.runtime import run_subprocess_tool
 from app.schemas import ExecutionCreate, ExecutionResponse
-from app.policy.engine import evaluate
+from app.schemas import ExecutionRecordListResponse, ExecutionRecordResponse
 from app.settings import settings
+
+import json
 
 router = APIRouter(prefix="/executions", tags=["executions"])
 
@@ -29,8 +34,23 @@ async def execute_tool(
     if tool is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tool not found")
 
+    trace_id = request.headers.get("x-trace-id", "")
+
     decision = evaluate(tool, payload.input, max_input_bytes=settings.max_input_bytes)
     if not decision.allowed:
+        await create_execution_record(
+            session=session,
+            tool=tool,
+            status="policy_denied",
+            error_code=decision.reason,
+            tool_input=payload.input,
+            output_json=None,
+            stdout="",
+            stderr="",
+            exit_code=None,
+            latency_ms=0,
+            trace_id=trace_id,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=decision.reason,
@@ -44,19 +64,59 @@ async def execute_tool(
         max_stderr_bytes=settings.max_stderr_bytes,
     )
 
-    trace_id = request.headers.get("x-trace-id", "")
-
     if runtime_result.status == "timeout":
+        await create_execution_record(
+            session=session,
+            tool=tool,
+            status="timeout",
+            error_code="tool_timeout",
+            tool_input=payload.input,
+            output_json=None,
+            stdout=runtime_result.stdout,
+            stderr=runtime_result.stderr,
+            exit_code=runtime_result.exit_code,
+            latency_ms=runtime_result.latency_ms,
+            trace_id=trace_id,
+        )
         raise HTTPException(
-            status_code=status.HTTP_408_REQUEST_TIMEOUT, 
-            detail="tool_timeout"
-            )
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+            detail="tool_timeout",
+        )
 
     if runtime_result.status == "output_too_large":
+        await create_execution_record(
+            session=session,
+            tool=tool,
+            status="failed",
+            error_code="tool_output_too_large",
+            tool_input=payload.input,
+            output_json=None,
+            stdout=runtime_result.stdout,
+            stderr=runtime_result.stderr,
+            exit_code=runtime_result.exit_code,
+            latency_ms=runtime_result.latency_ms,
+            trace_id=trace_id,
+        )
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, 
-            detail="tool_output_too_large"
-            )
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="tool_output_too_large",
+        )
+
+    error_code = None if runtime_result.status == "succeeded" else "tool_nonzero_exit"
+
+    await create_execution_record(
+        session=session,
+        tool=tool,
+        status=runtime_result.status,
+        error_code=error_code,
+        tool_input=payload.input,
+        output_json=runtime_result.output,
+        stdout=runtime_result.stdout,
+        stderr=runtime_result.stderr,
+        exit_code=runtime_result.exit_code,
+        latency_ms=runtime_result.latency_ms,
+        trace_id=trace_id,
+    )
 
     return ExecutionResponse(
         tool_name=tool.name,
@@ -68,4 +128,55 @@ async def execute_tool(
         output=runtime_result.output,
         trace_id=trace_id,
         latency_ms=runtime_result.latency_ms,
+    )
+
+def to_execution_record_response(record: ExecutionRecord) -> ExecutionRecordResponse:
+    return ExecutionRecordResponse(
+        id=record.id,
+        tool_name=record.tool_name,
+        tool_version=record.tool_version,
+        runtime=record.runtime,
+        entrypoint=record.entrypoint,
+        status=record.status,
+        error_code=record.error_code,
+        input_json=json.loads(record.input_json),
+        output_json=json.loads(record.output_json) if record.output_json else None,
+        stdout=record.stdout,
+        stderr=record.stderr,
+        exit_code=record.exit_code,
+        latency_ms=record.latency_ms,
+        trace_id=record.trace_id,
+        created_at=record.created_at,
+    )
+
+@router.get("/{execution_id}", response_model=ExecutionRecordResponse)
+async def get_execution(
+    execution_id: int,
+    session: AsyncSession = Depends(get_db_session),
+) -> ExecutionRecordResponse:
+    result = await session.execute(
+        select(ExecutionRecord).where(ExecutionRecord.id == execution_id)
+    )
+    record = result.scalar_one_or_none()
+
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="execution not found")
+
+    return to_execution_record_response(record)
+
+@router.get("", response_model=ExecutionRecordListResponse)
+async def list_executions(
+    trace_id: str | None = None,
+    session: AsyncSession = Depends(get_db_session),
+) -> ExecutionRecordListResponse:
+    stmt = select(ExecutionRecord).order_by(ExecutionRecord.id)
+
+    if trace_id:
+        stmt = stmt.where(ExecutionRecord.trace_id == trace_id)
+
+    result = await session.execute(stmt)
+    records = result.scalars().all()
+
+    return ExecutionRecordListResponse(
+        items=[to_execution_record_response(record) for record in records]
     )

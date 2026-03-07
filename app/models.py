@@ -35,3 +35,32 @@ class Tool(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
+
+class ExecutionRecord(Base):
+    __tablename__ = "executions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tool_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    tool_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    runtime: Mapped[str] = mapped_column(String(64), nullable=False)
+    entrypoint: Mapped[str] = mapped_column(String(256), nullable=False)
+
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    input_json: Mapped[str] = mapped_column(Text, nullable=False)
+    output_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    stdout: Mapped[str] = mapped_column(Text, nullable=False)
+    stderr: Mapped[str] = mapped_column(Text, nullable=False)
+
+    exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    trace_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
