@@ -23,4 +23,5 @@ async def test_policy_input_size_limit(app):
         exec_payload = {"tool_name": "echo_policy", "tool_version": "v1", "input": big}
         r2 = await ac.post("/executions", json=exec_payload)
         assert r2.status_code == 403
-        assert r2.json()["detail"] == "input_too_large"
+        body = r2.json()
+        assert body["error"] == "input_too_large"

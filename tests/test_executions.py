@@ -56,4 +56,5 @@ async def test_execute_tool_not_found(app):
 
         r = await ac.post("/executions", json=exec_payload)
         assert r.status_code == 404
-        assert r.json()["detail"] == "tool not found"
+        body = r.json()
+        assert body["error"] == "tool_not_found"

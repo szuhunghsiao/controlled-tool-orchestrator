@@ -77,3 +77,8 @@ class ExecutionRecordResponse(BaseModel):
 
 class ExecutionRecordListResponse(BaseModel):
     items: list[ExecutionRecordResponse]
+
+class ErrorResponse(BaseModel):
+    error: str
+    message: str
+    trace_id: str

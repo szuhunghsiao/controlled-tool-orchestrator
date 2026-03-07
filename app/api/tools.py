@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.deps import get_db_session
 from app.models import Tool
 from app.schemas import ToolCreate, ToolListResponse, ToolResponse
+from app.errors import ToolNotFoundError, ToolVersionConflictError
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 
@@ -49,10 +50,7 @@ async def create_tool(
         await session.commit()
     except IntegrityError:
         await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="tool version already exists",
-        )
+        raise ToolVersionConflictError()
 
     await session.refresh(tool)
     return to_tool_response(tool)
@@ -79,6 +77,6 @@ async def get_tool(
     tool = result.scalar_one_or_none()
 
     if tool is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tool not found")
+        raise ToolNotFoundError()
 
     return to_tool_response(tool)

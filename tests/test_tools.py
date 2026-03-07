@@ -89,4 +89,5 @@ async def test_duplicate_tool_version_returns_409(app):
 
         r2 = await ac.post("/tools", json=payload)
         assert r2.status_code == 409, r2.text
-        assert r2.json()["detail"] == "tool version already exists"
+        body = r2.json()
+        assert body["error"] == "tool_version_conflict"

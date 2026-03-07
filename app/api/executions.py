@@ -11,6 +11,13 @@ from app.runtime import run_subprocess_tool
 from app.schemas import ExecutionCreate, ExecutionResponse
 from app.schemas import ExecutionRecordListResponse, ExecutionRecordResponse
 from app.settings import settings
+from app.errors import (
+    ExecutionNotFoundError,
+    PolicyDeniedError,
+    ToolNotFoundError,
+    ToolOutputTooLargeError,
+    ToolTimeoutError,
+)
 
 import json
 
@@ -32,7 +39,7 @@ async def execute_tool(
     tool = result.scalar_one_or_none()
 
     if tool is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tool not found")
+        raise ToolNotFoundError()
 
     trace_id = request.headers.get("x-trace-id", "")
 
@@ -51,10 +58,7 @@ async def execute_tool(
             latency_ms=0,
             trace_id=trace_id,
         )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=decision.reason,
-        )
+        raise PolicyDeniedError(decision.reason or "policy_denied")
 
     runtime_result = await run_subprocess_tool(
         entrypoint=tool.entrypoint,
@@ -78,10 +82,7 @@ async def execute_tool(
             latency_ms=runtime_result.latency_ms,
             trace_id=trace_id,
         )
-        raise HTTPException(
-            status_code=status.HTTP_408_REQUEST_TIMEOUT,
-            detail="tool_timeout",
-        )
+        raise ToolTimeoutError()
 
     if runtime_result.status == "output_too_large":
         await create_execution_record(
@@ -97,10 +98,7 @@ async def execute_tool(
             latency_ms=runtime_result.latency_ms,
             trace_id=trace_id,
         )
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="tool_output_too_large",
-        )
+        raise ToolOutputTooLargeError()
 
     error_code = None if runtime_result.status == "succeeded" else "tool_nonzero_exit"
 
@@ -160,7 +158,7 @@ async def get_execution(
     record = result.scalar_one_or_none()
 
     if record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="execution not found")
+        raise ExecutionNotFoundError()
 
     return to_execution_record_response(record)
 
