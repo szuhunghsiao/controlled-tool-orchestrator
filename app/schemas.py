@@ -72,6 +72,8 @@ class ExecutionRecordResponse(BaseModel):
     exit_code: int | None
     latency_ms: int
     trace_id: str
+    replay_of_execution_id: int | None
+    replay_reason: str | None
     created_at: datetime
 
 
@@ -82,3 +84,6 @@ class ErrorResponse(BaseModel):
     error: str
     message: str
     trace_id: str
+
+class ReplayExecutionRequest(BaseModel):
+    reason: str | None = None

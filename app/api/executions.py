@@ -10,6 +10,7 @@ from app.policy.engine import evaluate
 from app.runtime import run_subprocess_tool
 from app.schemas import ExecutionCreate, ExecutionResponse
 from app.schemas import ExecutionRecordListResponse, ExecutionRecordResponse
+from app.schemas import ReplayExecutionRequest
 from app.settings import settings
 from app.errors import (
     ExecutionNotFoundError,
@@ -43,89 +44,11 @@ async def execute_tool(
 
     trace_id = request.headers.get("x-trace-id", "")
 
-    decision = evaluate(tool, payload.input, max_input_bytes=settings.max_input_bytes)
-    if not decision.allowed:
-        await create_execution_record(
-            session=session,
-            tool=tool,
-            status="policy_denied",
-            error_code=decision.reason,
-            tool_input=payload.input,
-            output_json=None,
-            stdout="",
-            stderr="",
-            exit_code=None,
-            latency_ms=0,
-            trace_id=trace_id,
-        )
-        raise PolicyDeniedError(decision.reason or "policy_denied")
-
-    runtime_result = await run_subprocess_tool(
-        entrypoint=tool.entrypoint,
-        tool_input=payload.input,
-        timeout_ms=tool.timeout_ms,
-        max_stdout_bytes=settings.max_stdout_bytes,
-        max_stderr_bytes=settings.max_stderr_bytes,
-    )
-
-    if runtime_result.status == "timeout":
-        await create_execution_record(
-            session=session,
-            tool=tool,
-            status="timeout",
-            error_code="tool_timeout",
-            tool_input=payload.input,
-            output_json=None,
-            stdout=runtime_result.stdout,
-            stderr=runtime_result.stderr,
-            exit_code=runtime_result.exit_code,
-            latency_ms=runtime_result.latency_ms,
-            trace_id=trace_id,
-        )
-        raise ToolTimeoutError()
-
-    if runtime_result.status == "output_too_large":
-        await create_execution_record(
-            session=session,
-            tool=tool,
-            status="failed",
-            error_code="tool_output_too_large",
-            tool_input=payload.input,
-            output_json=None,
-            stdout=runtime_result.stdout,
-            stderr=runtime_result.stderr,
-            exit_code=runtime_result.exit_code,
-            latency_ms=runtime_result.latency_ms,
-            trace_id=trace_id,
-        )
-        raise ToolOutputTooLargeError()
-
-    error_code = None if runtime_result.status == "succeeded" else "tool_nonzero_exit"
-
-    await create_execution_record(
-        session=session,
+    return await _execute_with_tool(
         tool=tool,
-        status=runtime_result.status,
-        error_code=error_code,
         tool_input=payload.input,
-        output_json=runtime_result.output,
-        stdout=runtime_result.stdout,
-        stderr=runtime_result.stderr,
-        exit_code=runtime_result.exit_code,
-        latency_ms=runtime_result.latency_ms,
         trace_id=trace_id,
-    )
-
-    return ExecutionResponse(
-        tool_name=tool.name,
-        tool_version=tool.version,
-        status=runtime_result.status,
-        exit_code=runtime_result.exit_code,
-        stdout=runtime_result.stdout,
-        stderr=runtime_result.stderr,
-        output=runtime_result.output,
-        trace_id=trace_id,
-        latency_ms=runtime_result.latency_ms,
+        session=session,
     )
 
 def to_execution_record_response(record: ExecutionRecord) -> ExecutionRecordResponse:
@@ -144,6 +67,8 @@ def to_execution_record_response(record: ExecutionRecord) -> ExecutionRecordResp
         exit_code=record.exit_code,
         latency_ms=record.latency_ms,
         trace_id=record.trace_id,
+        replay_of_execution_id=record.replay_of_execution_id,
+        replay_reason=record.replay_reason,
         created_at=record.created_at,
     )
 
@@ -177,4 +102,144 @@ async def list_executions(
 
     return ExecutionRecordListResponse(
         items=[to_execution_record_response(record) for record in records]
+    )
+
+async def _execute_with_tool(
+    *,
+    tool: Tool,
+    tool_input: dict,
+    trace_id: str,
+    session: AsyncSession,
+    replay_of_execution_id: int | None = None,
+    replay_reason: str | None = None,
+) -> ExecutionResponse:
+    decision = evaluate(tool, tool_input, max_input_bytes=settings.max_input_bytes)
+    if not decision.allowed:
+        await create_execution_record(
+            session=session,
+            tool=tool,
+            status="policy_denied",
+            error_code=decision.reason,
+            tool_input=tool_input,
+            output_json=None,
+            stdout="",
+            stderr="",
+            exit_code=None,
+            latency_ms=0,
+            trace_id=trace_id,
+            replay_of_execution_id=replay_of_execution_id,
+            replay_reason=replay_reason,
+        )
+        raise PolicyDeniedError(decision.reason or "policy_denied")
+
+    runtime_result = await run_subprocess_tool(
+        entrypoint=tool.entrypoint,
+        tool_input=tool_input,
+        timeout_ms=tool.timeout_ms,
+        max_stdout_bytes=settings.max_stdout_bytes,
+        max_stderr_bytes=settings.max_stderr_bytes,
+    )
+
+    if runtime_result.status == "timeout":
+        await create_execution_record(
+            session=session,
+            tool=tool,
+            status="timeout",
+            error_code="tool_timeout",
+            tool_input=tool_input,
+            output_json=None,
+            stdout=runtime_result.stdout,
+            stderr=runtime_result.stderr,
+            exit_code=runtime_result.exit_code,
+            latency_ms=runtime_result.latency_ms,
+            trace_id=trace_id,
+            replay_of_execution_id=replay_of_execution_id,
+            replay_reason=replay_reason,
+        )
+        raise ToolTimeoutError()
+
+    if runtime_result.status == "output_too_large":
+        await create_execution_record(
+            session=session,
+            tool=tool,
+            status="failed",
+            error_code="tool_output_too_large",
+            tool_input=tool_input,
+            output_json=None,
+            stdout=runtime_result.stdout,
+            stderr=runtime_result.stderr,
+            exit_code=runtime_result.exit_code,
+            latency_ms=runtime_result.latency_ms,
+            trace_id=trace_id,
+            replay_of_execution_id=replay_of_execution_id,
+            replay_reason=replay_reason,
+        )
+        raise ToolOutputTooLargeError()
+
+    error_code = None if runtime_result.status == "succeeded" else "tool_nonzero_exit"
+
+    await create_execution_record(
+        session=session,
+        tool=tool,
+        status=runtime_result.status,
+        error_code=error_code,
+        tool_input=tool_input,
+        output_json=runtime_result.output,
+        stdout=runtime_result.stdout,
+        stderr=runtime_result.stderr,
+        exit_code=runtime_result.exit_code,
+        latency_ms=runtime_result.latency_ms,
+        trace_id=trace_id,
+        replay_of_execution_id=replay_of_execution_id,
+        replay_reason=replay_reason,
+    )
+
+    return ExecutionResponse(
+        tool_name=tool.name,
+        tool_version=tool.version,
+        status=runtime_result.status,
+        exit_code=runtime_result.exit_code,
+        stdout=runtime_result.stdout,
+        stderr=runtime_result.stderr,
+        output=runtime_result.output,
+        trace_id=trace_id,
+        latency_ms=runtime_result.latency_ms,
+    )
+
+@router.post("/{execution_id}/replay", response_model=ExecutionResponse)
+async def replay_execution(
+    execution_id: int,
+    payload: ReplayExecutionRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> ExecutionResponse:
+    result = await session.execute(
+        select(ExecutionRecord).where(ExecutionRecord.id == execution_id)
+    )
+    original = result.scalar_one_or_none()
+
+    if original is None:
+        raise ExecutionNotFoundError()
+
+    tool_result = await session.execute(
+        select(Tool).where(
+            Tool.name == original.tool_name,
+            Tool.version == original.tool_version,
+        )
+    )
+    tool = tool_result.scalar_one_or_none()
+
+    if tool is None:
+        raise ToolNotFoundError()
+
+    tool_input = json.loads(original.input_json)
+    trace_id = request.headers.get("x-trace-id", "")
+
+    return await _execute_with_tool(
+        tool=tool,
+        tool_input=tool_input,
+        trace_id=trace_id,
+        session=session,
+        replay_of_execution_id=original.id,
+        replay_reason=payload.reason or "manual_replay",
     )

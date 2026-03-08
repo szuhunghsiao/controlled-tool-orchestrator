@@ -59,6 +59,10 @@ class ExecutionRecord(Base):
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
 
     trace_id: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    replay_of_execution_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    replay_reason: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

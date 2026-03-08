@@ -19,6 +19,8 @@ async def create_execution_record(
     exit_code: int | None,
     latency_ms: int,
     trace_id: str,
+    replay_of_execution_id: int | None = None,
+    replay_reason: str | None = None,
 ) -> ExecutionRecord:
     record = ExecutionRecord(
         tool_name=tool.name,
@@ -34,6 +36,8 @@ async def create_execution_record(
         exit_code=exit_code,
         latency_ms=latency_ms,
         trace_id=trace_id,
+        replay_of_execution_id=replay_of_execution_id,
+        replay_reason=replay_reason,
     )
 
     session.add(record)
