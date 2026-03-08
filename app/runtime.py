@@ -41,7 +41,7 @@ async def run_subprocess_tool(
             process.communicate(stdin_bytes),
             timeout=timeout_sec,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         process.kill()
         await process.wait()
         latency_ms = int((time.perf_counter() - start) * 1000)

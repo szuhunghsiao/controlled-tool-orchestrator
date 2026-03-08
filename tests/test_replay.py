@@ -65,6 +65,7 @@ async def test_replay_execution_creates_new_record_with_lineage(app):
         assert replay_record["input_json"] == {"text": "hello replay"}
         assert replay_record["output_json"] == {"echoed": "hello replay"}
 
+
 @pytest.mark.asyncio
 async def test_replay_missing_execution_returns_404(app):
     transport = ASGITransport(app=app)

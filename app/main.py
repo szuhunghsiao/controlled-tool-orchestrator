@@ -2,16 +2,14 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
-from app.errors import AppError
-
-from app.api.health import router as health_router
+from app.api.executions import router as executions_router
 from app.api.health import router as health_router
 from app.api.tools import router as tools_router
-from app.api.executions import router as executions_router
 from app.db import get_engine
+from app.errors import AppError
 from app.logging import setup_logging
 from app.migrations import run_migrations
 from app.settings import settings
@@ -76,7 +74,7 @@ def create_app() -> FastAPI:
                     "error": "internal_error",
                     "message": "an unexpected internal error occurred",
                     "trace_id": trace_id,
-                    },
+                },
                 headers={"x-trace-id": trace_id},
             )
 

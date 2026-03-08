@@ -1,14 +1,14 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db_session
+from app.errors import ToolNotFoundError, ToolVersionConflictError
 from app.models import Tool
 from app.schemas import ToolCreate, ToolListResponse, ToolResponse
-from app.errors import ToolNotFoundError, ToolVersionConflictError
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 
@@ -48,9 +48,9 @@ async def create_tool(
 
     try:
         await session.commit()
-    except IntegrityError:
+    except IntegrityError as err:
         await session.rollback()
-        raise ToolVersionConflictError()
+        raise ToolVersionConflictError() from err
 
     await session.refresh(tool)
     return to_tool_response(tool)
@@ -71,9 +71,7 @@ async def get_tool(
     version: str,
     session: AsyncSession = Depends(get_db_session),
 ) -> ToolResponse:
-    result = await session.execute(
-        select(Tool).where(Tool.name == name, Tool.version == version)
-    )
+    result = await session.execute(select(Tool).where(Tool.name == name, Tool.version == version))
     tool = result.scalar_one_or_none()
 
     if tool is None:

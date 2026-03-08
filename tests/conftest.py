@@ -14,6 +14,7 @@ async def app():
 
     return create_app()
 
+
 # # tests/conftest.py
 # import pytest
 # from httpx import ASGITransport, AsyncClient
@@ -25,7 +26,7 @@ async def app():
 
 # @pytest.fixture
 # async def app(tmp_path):
-#     # 1) Each test use it's own sqlite file, isolate completely 
+#     # 1) Each test use it's own sqlite file, isolate completely
 #     db_path = tmp_path / "test.db"
 #     settings.database_url = f"sqlite+aiosqlite:///{db_path}"
 
@@ -52,6 +53,6 @@ async def app():
 
 # @pytest.fixture
 # async def client(app):
-#     transport = ASGITransport(app=app) 
+#     transport = ASGITransport(app=app)
 #     async with AsyncClient(transport=transport, base_url="http://test") as ac:
 #         yield ac

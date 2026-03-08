@@ -50,6 +50,7 @@ async def test_execution_record_created_for_success(app):
         assert item["output_json"] == {"echoed": "hello audit"}
         assert item["trace_id"] == "trace-audit-1"
 
+
 @pytest.mark.asyncio
 async def test_execution_record_created_for_policy_denied(app):
     transport = ASGITransport(app=app)

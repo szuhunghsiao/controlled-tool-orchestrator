@@ -40,10 +40,11 @@ def rule_input_size_limit(tool_input: dict[str, Any], max_bytes: int) -> PolicyD
     if input_bytes > max_bytes:
         logger.info(
             "policy_deny",
-            extra={"reason": "input_too_large",
+            extra={
+                "reason": "input_too_large",
                 "input_bytes": input_bytes,
                 "max_bytes": max_bytes,
-                },
+            },
         )
         return deny("input_too_large")
     return allow()

@@ -1,17 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import json
+
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import create_execution_record
 from app.deps import get_db_session
-from app.models import Tool
-from app.models import ExecutionRecord
-from app.policy.engine import evaluate
-from app.runtime import run_subprocess_tool
-from app.schemas import ExecutionCreate, ExecutionResponse
-from app.schemas import ExecutionRecordListResponse, ExecutionRecordResponse
-from app.schemas import ReplayExecutionRequest
-from app.settings import settings
 from app.errors import (
     ExecutionNotFoundError,
     PolicyDeniedError,
@@ -19,8 +13,17 @@ from app.errors import (
     ToolOutputTooLargeError,
     ToolTimeoutError,
 )
-
-import json
+from app.models import ExecutionRecord, Tool
+from app.policy.engine import evaluate
+from app.runtime import run_subprocess_tool
+from app.schemas import (
+    ExecutionCreate,
+    ExecutionRecordListResponse,
+    ExecutionRecordResponse,
+    ExecutionResponse,
+    ReplayExecutionRequest,
+)
+from app.settings import settings
 
 router = APIRouter(prefix="/executions", tags=["executions"])
 
@@ -51,6 +54,7 @@ async def execute_tool(
         session=session,
     )
 
+
 def to_execution_record_response(record: ExecutionRecord) -> ExecutionRecordResponse:
     return ExecutionRecordResponse(
         id=record.id,
@@ -72,6 +76,7 @@ def to_execution_record_response(record: ExecutionRecord) -> ExecutionRecordResp
         created_at=record.created_at,
     )
 
+
 @router.get("/{execution_id}", response_model=ExecutionRecordResponse)
 async def get_execution(
     execution_id: int,
@@ -86,6 +91,7 @@ async def get_execution(
         raise ExecutionNotFoundError()
 
     return to_execution_record_response(record)
+
 
 @router.get("", response_model=ExecutionRecordListResponse)
 async def list_executions(
@@ -103,6 +109,7 @@ async def list_executions(
     return ExecutionRecordListResponse(
         items=[to_execution_record_response(record) for record in records]
     )
+
 
 async def _execute_with_tool(
     *,
@@ -205,6 +212,7 @@ async def _execute_with_tool(
         trace_id=trace_id,
         latency_ms=runtime_result.latency_ms,
     )
+
 
 @router.post("/{execution_id}/replay", response_model=ExecutionResponse)
 async def replay_execution(

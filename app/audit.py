@@ -30,7 +30,9 @@ async def create_execution_record(
         status=status,
         error_code=error_code,
         input_json=json.dumps(tool_input, ensure_ascii=False),
-        output_json=json.dumps(output_json, ensure_ascii=False) if output_json is not None else None,
+        output_json=json.dumps(output_json, ensure_ascii=False)
+        if output_json is not None
+        else None,
         stdout=stdout,
         stderr=stderr,
         exit_code=exit_code,

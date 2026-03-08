@@ -2,7 +2,6 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 
-
 @pytest.mark.asyncio
 async def test_healthz_ok(app):
     transport = ASGITransport(app=app)

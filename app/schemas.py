@@ -3,7 +3,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-
 ALLOWED_RUNTIMES = {"subprocess-v1"}
 
 
@@ -40,6 +39,7 @@ class ToolResponse(BaseModel):
 class ToolListResponse(BaseModel):
     items: list[ToolResponse]
 
+
 class ExecutionCreate(BaseModel):
     tool_name: str = Field(min_length=1, max_length=128)
     tool_version: str = Field(min_length=1, max_length=32)
@@ -56,6 +56,7 @@ class ExecutionResponse(BaseModel):
     output: dict[str, Any] | None
     trace_id: str
     latency_ms: int
+
 
 class ExecutionRecordResponse(BaseModel):
     id: int
@@ -80,10 +81,12 @@ class ExecutionRecordResponse(BaseModel):
 class ExecutionRecordListResponse(BaseModel):
     items: list[ExecutionRecordResponse]
 
+
 class ErrorResponse(BaseModel):
     error: str
     message: str
     trace_id: str
+
 
 class ReplayExecutionRequest(BaseModel):
     reason: str | None = None
